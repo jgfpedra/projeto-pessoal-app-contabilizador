@@ -1,7 +1,9 @@
 import { Preferences } from '@capacitor/preferences';
-import { Task, TaskData } from '../types';
+import { Task, TaskData, DailyItem } from '../types';
 
 const TASKS_KEY = 'tasks';
+const DAILY_ITEMS_KEY = 'daily_items';
+const DAILY_LOGS_KEY = 'daily_logs';
 
 export function today(): string {
   return new Date().toISOString().split('T')[0];
@@ -23,13 +25,14 @@ export async function getTasks(): Promise<Task[]> {
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export async function createTask(name: string, emoji: string, color: string): Promise<Task> {
+export async function createTask(name: string, emoji: string, color: string, type: 'consistency' | 'daily' = 'consistency'): Promise<Task> {
   const data = await getAllData();
   const task: Task = {
     id: crypto.randomUUID(),
     name,
     emoji,
     color,
+    type,
     createdAt: new Date().toISOString(),
   };
   data[task.id] = { task, logs: {} };
@@ -146,4 +149,59 @@ export async function getMonthlyStats(taskId: string): Promise<{ label: string; 
     }
     return { label, count };
   });
+}
+
+// Backlog
+async function getAllDailyItems(): Promise<Record<string, DailyItem>> {
+  const { value } = await Preferences.get({ key: DAILY_ITEMS_KEY });
+  return value ? JSON.parse(value) : {};
+}
+
+export async function getDailyItemsForTask(taskId: string): Promise<DailyItem[]> {
+  const all = await getAllDailyItems();
+  return Object.values(all).filter(i => i.taskId === taskId);
+}
+
+export async function createDailyItem(taskId: string, name: string): Promise<DailyItem> {
+  const all = await getAllDailyItems();
+  const item: DailyItem = { id: crypto.randomUUID(), taskId, name, createdAt: new Date().toISOString() };
+  all[item.id] = item;
+  await Preferences.set({ key: DAILY_ITEMS_KEY, value: JSON.stringify(all) });
+  return item;
+}
+
+export async function deleteDailyItem(id: string): Promise<void> {
+  const all = await getAllDailyItems();
+  delete all[id];
+  await Preferences.set({ key: DAILY_ITEMS_KEY, value: JSON.stringify(all) });
+}
+
+// Logs diários: quais itens foram selecionados hoje e se estão feitos
+// shape: { [date]: { [itemId]: boolean } }
+async function getAllDailyLogs(): Promise<Record<string, Record<string, boolean>>> {
+  const { value } = await Preferences.get({ key: DAILY_LOGS_KEY });
+  return value ? JSON.parse(value) : {};
+}
+
+export async function getDailyLogForDate(date: string): Promise<Record<string, boolean>> {
+  const all = await getAllDailyLogs();
+  return all[date] ?? {};
+}
+
+export async function setItemSelectedToday(itemId: string, date: string, selected: boolean): Promise<void> {
+  const all = await getAllDailyLogs();
+  if (!all[date]) all[date] = {};
+  if (!selected) {
+    delete all[date][itemId];
+  } else {
+    all[date][itemId] = all[date][itemId] ?? false; // preserva done se já existia
+  }
+  await Preferences.set({ key: DAILY_LOGS_KEY, value: JSON.stringify(all) });
+}
+
+export async function toggleDailyItemDone(itemId: string, date: string): Promise<void> {
+  const all = await getAllDailyLogs();
+  if (!all[date]) all[date] = {};
+  all[date][itemId] = !all[date][itemId];
+  await Preferences.set({ key: DAILY_LOGS_KEY, value: JSON.stringify(all) });
 }

@@ -4,6 +4,7 @@ export interface Task {
   emoji: string;
   color: string;
   createdAt: string;
+  type: 'consistency' | 'daily';
 }
 
 export interface TaskLog {
@@ -14,4 +15,11 @@ export interface TaskLog {
 export interface TaskData {
   task: Task;
   logs: Record<string, number>; // date -> count
+}
+
+export interface DailyItem {
+  id: string;
+  taskId: string;
+  name: string;
+  createdAt: string;
 }
