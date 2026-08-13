@@ -9,7 +9,7 @@ export type Screen =
   | { name: 'home' }
   | { name: 'stats' }
   | { name: 'calendar'; taskId: string; taskName: string; taskColor: string }
-  | { name: 'addTask'; task?: { id: string; name: string; emoji: string; color: string } };
+  | { name: 'addTask'; task?: { id: string; name: string; emoji: string; color: string; type?: 'consistency' | 'daily' } };
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'home' });
@@ -41,7 +41,11 @@ export default function App() {
           />
         )}
         {screen.name === 'addTask' && (
-          <AddTaskScreen task={screen.task} onBack={goBack} />
+          <AddTaskScreen
+            task={screen.task}
+            onBack={goBack}
+            onSaved={(task) => setScreen({ name: 'addTask', task })}
+          />
         )}
       </div>
       {showNav && <BottomNav active={tab} onSwitch={switchTab} navigate={navigate} />}

@@ -1,28 +1,38 @@
-import React, { useState } from 'react';
-import { createTask, updateTask, deleteTask } from '../db/storage';
+import { useState, useEffect } from 'react';
+import { createTask, updateTask, deleteTask, createDailyItem, deleteDailyItem, getDailyItemsForTask } from '../db/storage';
+import { DailyItem } from '../types';
 
 const TASK_COLORS = ['#C8FF00', '#00E5FF', '#FF6B35', '#FF2D78', '#A855F7', '#34D399', '#FBBF24', '#60A5FA'];
 const EMOJIS = ['💪', '🏃', '🧘', '🚴', '🏊', '⚽', '🎯', '📚', '💧', '🥗', '😴', '🧠', '✍️', '🎸', '🎨', '🌿'];
 
 interface Props {
-  task?: { id: string; name: string; emoji: string; color: string };
+  task?: { id: string; name: string; emoji: string; color: string; type?: 'consistency' | 'daily' };
   onBack: () => void;
+  onSaved: (task: { id: string; name: string; emoji: string; color: string; type: 'consistency' | 'daily' }) => void;
 }
 
-export default function AddTaskScreen({ task, onBack }: Props) {
+export default function AddTaskScreen({ task, onBack, onSaved }: Props) {
   const [name, setName] = useState(task?.name ?? '');
   const [emoji, setEmoji] = useState(task?.emoji ?? '💪');
   const [color, setColor] = useState(task?.color ?? TASK_COLORS[0]);
   const [error, setError] = useState('');
+  const [type, setType] = useState<'consistency' | 'daily'>(task?.type ?? 'consistency');
+  const [items, setItems] = useState<DailyItem[]>([]);
+  const [newItem, setNewItem] = useState('');
+
+  useEffect(() => {
+    if (task?.type === 'daily') getDailyItemsForTask(task.id).then(setItems);
+  }, [task]);
 
   const handleSave = async () => {
     if (!name.trim()) { setError('Please enter a name.'); return; }
     if (task) {
       await updateTask(task.id, name.trim(), emoji, color);
+      onBack();
     } else {
-      await createTask(name.trim(), emoji, color);
+      const created = await createTask(name.trim(), emoji, color, type);
+      onSaved(created); // redireciona pra edição da task recém-criada
     }
-    onBack();
   };
 
   const handleDelete = async () => {
@@ -73,6 +83,22 @@ export default function AddTaskScreen({ task, onBack }: Props) {
           />
           {error && <span style={{ fontSize: 12, color: 'var(--danger)' }}>{error}</span>}
         </div>
+        {/* Daily Tasks*/}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <label style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, letterSpacing: 1 }}>TIPO</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {(['consistency', 'daily'] as const).map(t => (
+              <button key={t} onClick={() => setType(t)} style={{
+                flex: 1, padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 600,
+                background: type === t ? color + '33' : 'var(--card)',
+                border: `1px solid ${type === t ? color : 'var(--border)'}`,
+                color: type === t ? color : 'var(--muted)', cursor: 'pointer',
+              }}>
+                {t === 'consistency' ? '🔥 Consistência' : '📝 Dia a dia'}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Emoji */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -108,6 +134,55 @@ export default function AddTaskScreen({ task, onBack }: Props) {
             ))}
           </div>
         </div>
+
+        {type === 'daily' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, letterSpacing: 1 }}>BACKLOG</label>
+
+            {items.map(item => (
+              <div key={item.id} style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                background: 'var(--card)', borderRadius: 10, padding: '10px 12px',
+                border: '1px solid var(--border)'
+              }}>
+                <span style={{ flex: 1, fontSize: 14 }}>{item.name}</span>
+                <button onClick={async () => {
+                  await deleteDailyItem(item.id);
+                  setItems(items.filter(i => i.id !== item.id));
+                }} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer' }}>×</button>
+              </div>
+            ))}
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                value={newItem}
+                onChange={e => setNewItem(e.target.value)}
+                onKeyDown={async e => {
+                  if (e.key === 'Enter' && newItem.trim() && task) {
+                    const item = await createDailyItem(task.id, newItem.trim());
+                    setItems([...items, item]);
+                    setNewItem('');
+                  }
+                }}
+                placeholder="Novo item..."
+                style={{
+                  flex: 1, background: 'var(--card)', border: '1px solid var(--border)',
+                  borderRadius: 10, padding: '10px 12px', color: 'var(--text)', fontSize: 14
+                }}
+              />
+              <button onClick={async () => {
+                if (!newItem.trim() || !task) return;
+                const item = await createDailyItem(task.id, newItem.trim());
+                setItems([...items, item]);
+                setNewItem('');
+              }} style={{
+                padding: '10px 16px', borderRadius: 10, background: color,
+                color: '#000', fontWeight: 700, fontSize: 18, border: 'none', cursor: 'pointer'
+              }}>+</button>
+            </div>
+            {!task && <span style={{ fontSize: 11, color: 'var(--muted)' }}>Salve a tarefa primeiro para adicionar itens ao backlog.</span>}
+          </div>
+        )}
 
         {task && (
           <button

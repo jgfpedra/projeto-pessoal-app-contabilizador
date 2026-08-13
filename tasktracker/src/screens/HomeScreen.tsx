@@ -32,7 +32,6 @@ export default function HomeScreen({ navigate }: Props) {
   }, []);
 
   const reloadDaily = useCallback(async () => {
-    // Pega todos os daily tasks e agrega seus itens
     const all = await getAllTasksWithStats();
     const dailyTasks = all.filter(r => r.task.type === 'daily');
     const items: DailyItem[] = [];
