@@ -18,11 +18,17 @@ interface TaskRow {
 
 interface Props { navigate: (s: Screen) => void; }
 
+interface DailyTaskRow {
+  task: { id: string; name: string; emoji: string; color: string; type: string };
+  items: DailyItem[];
+}
+
 export default function HomeScreen({ navigate }: Props) {
   const [tab, setTab] = useState<Tab>('consistency');
   const [tasks, setTasks] = useState<TaskRow[]>([]);
-  const [dailyItems, setDailyItems] = useState<DailyItem[]>([]);
+  const [dailyRows, setDailyRows] = useState<DailyTaskRow[]>([]);
   const [dailyLog, setDailyLog] = useState<Record<string, boolean>>({});
+  const [openTasks, setOpenTasks] = useState<Set<string>>(new Set());
 
   const dateStr = today();
 
@@ -33,13 +39,12 @@ export default function HomeScreen({ navigate }: Props) {
 
   const reloadDaily = useCallback(async () => {
     const all = await getAllTasksWithStats();
-    const dailyTasks = all.filter(r => r.task.type === 'daily');
-    const items: DailyItem[] = [];
-    for (const r of dailyTasks) {
-      const its = await getDailyItemsForTask(r.task.id);
-      items.push(...its);
+    const rows: DailyTaskRow[] = [];
+    for (const r of all.filter(r => r.task.type === 'daily')) {
+      const items = await getDailyItemsForTask(r.task.id);
+      rows.push({ task: r.task, items });
     }
-    setDailyItems(items);
+    setDailyRows(rows);
     setDailyLog(await getDailyLogForDate(dateStr));
   }, [dateStr]);
 
@@ -65,8 +70,6 @@ export default function HomeScreen({ navigate }: Props) {
   };
 
   const consistencyTasks = tasks.filter(r => r.task.type === 'consistency' || !r.task.type);
-  const selectedItems = dailyItems.filter(i => i.id in dailyLog);
-  const backlogItems = dailyItems.filter(i => !(i.id in dailyLog));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -123,56 +126,108 @@ export default function HomeScreen({ navigate }: Props) {
             </div>
           ))
         )}
-
-        {/* ── DAILY TAB ── */}
         {tab === 'daily' && (
           <>
-            {/* Itens selecionados para hoje */}
-            {selectedItems.length > 0 && (
+            {/* HOJE — sub-itens selecionados, agrupados por task */}
+            {dailyRows.some(r => r.items.some(i => i.id in dailyLog)) && (
               <>
                 <SectionLabel>Hoje</SectionLabel>
-                {selectedItems.map(item => (
-                  <div key={item.id} style={{ ...cardStyle, gap: 10 }}>
-                    <button onClick={() => handleToggleDone(item.id)} style={{
-                      width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-                      border: `2px solid var(--border)`, background: dailyLog[item.id] ? 'var(--fg)' : 'none',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      {dailyLog[item.id] && <span style={{ color: 'var(--bg)', fontSize: 14 }}>✓</span>}
-                    </button>
-                    <span style={{
-                      flex: 1, fontSize: 15, fontWeight: 500,
-                      textDecoration: dailyLog[item.id] ? 'line-through' : 'none',
-                      color: dailyLog[item.id] ? 'var(--muted)' : 'var(--fg)'
-                    }}>
-                      {item.name}
-                    </span>
-                    <button onClick={() => handleToggleSelected(item.id, false)}
-                      style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer' }}>
-                      ×
-                    </button>
-                  </div>
-                ))}
+                {dailyRows.map(({ task, items }) => {
+                  const selected = items.filter(i => i.id in dailyLog);
+                  if (selected.length === 0) return null;
+                  const done = selected.filter(i => dailyLog[i.id]);
+                  const notDone = selected.filter(i => !dailyLog[i.id]);
+                  const sorted = [...notDone, ...done];
+                  return (
+                    <div key={task.id}>
+                      {/* header da task */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span style={{ fontSize: 16 }}>{task.emoji}</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: task.color }}>{task.name}</span>
+                      </div>
+                      {sorted.map(item => (
+                        <div key={item.id} style={{ ...cardStyle, marginBottom: 6, marginLeft: 8 }}>
+                          <button onClick={() => handleToggleDone(item.id)} style={{
+                            width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                            border: `2px solid var(--border)`,
+                            background: dailyLog[item.id] ? 'var(--fg)' : 'none',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            cursor: 'pointer',
+                          }}>
+                            {dailyLog[item.id] && <span style={{ color: 'var(--bg)', fontSize: 12 }}>✓</span>}
+                          </button>
+                          <span style={{
+                            flex: 1, fontSize: 14,
+                            textDecoration: dailyLog[item.id] ? 'line-through' : 'none',
+                            color: dailyLog[item.id] ? 'var(--muted)' : 'var(--fg)'
+                          }}>
+                            {item.name}
+                          </span>
+                          <button onClick={() => handleToggleSelected(item.id, false)}
+                            style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer' }}>×</button>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
               </>
             )}
 
-            {/* Backlog */}
-            {backlogItems.length > 0 && (
+            {/* BACKLOG — tasks com dropdown */}
+            {dailyRows.length > 0 && (
               <>
                 <SectionLabel>Backlog</SectionLabel>
-                {backlogItems.map(item => (
-                  <div key={item.id} style={{ ...cardStyle, opacity: 0.7 }}>
-                    <span style={{ flex: 1, fontSize: 15 }}>{item.name}</span>
-                    <button onClick={() => handleToggleSelected(item.id, true)} style={{
-                      padding: '4px 12px', borderRadius: 8, border: '1px solid var(--border)',
-                      background: 'none', color: 'var(--fg)', fontSize: 13, cursor: 'pointer',
-                    }}>+ Hoje</button>
-                  </div>
-                ))}
+                {dailyRows.map(({ task, items }) => {
+                  const backlog = items.filter(i => !(i.id in dailyLog));
+                  const isOpen = openTasks.has(task.id);
+                  return (
+                    <div key={task.id} style={{ ...cardStyle, flexDirection: 'column', alignItems: 'stretch', gap: 0, padding: 0, overflow: 'hidden' }}>
+                      {/* header clicável */}
+                      <button onClick={() => setOpenTasks(prev => {
+                        const next = new Set(prev);
+                        next.has(task.id) ? next.delete(task.id) : next.add(task.id);
+                        return next;
+                      })} style={{
+                        display: 'flex', alignItems: 'center', gap: 10, padding: '14px 12px',
+                        background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left'
+                      }}>
+                        <span style={{ fontSize: 22 }}>{task.emoji}</span>
+                        <span style={{ flex: 1, fontSize: 15, fontWeight: 600, color: 'var(--fg)' }}>{task.name}</span>
+                        <span style={{ color: 'var(--muted)', fontSize: 12 }}>{backlog.length} itens</span>
+                        <span style={{ color: 'var(--muted)', fontSize: 14, marginLeft: 4 }}>{isOpen ? '▲' : '▼'}</span>
+                      </button>
+
+                      {/* sub-itens */}
+                      {isOpen && backlog.length > 0 && (
+                        <div style={{ borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
+                          {backlog.map(item => (
+                            <div key={item.id} style={{
+                              display: 'flex', alignItems: 'center', gap: 10,
+                              padding: '10px 12px', borderBottom: '1px solid var(--border)'
+                            }}>
+                              <span style={{ flex: 1, fontSize: 14, color: 'var(--fg)' }}>{item.name}</span>
+                              <button onClick={() => handleToggleSelected(item.id, true)} style={{
+                                padding: '4px 10px', borderRadius: 8, border: `1px solid ${task.color}`,
+                                background: 'none', color: task.color, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                              }}>+ Hoje</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {isOpen && backlog.length === 0 && (
+                        <div style={{
+                          padding: '10px 12px', borderTop: '1px solid var(--border)',
+                          fontSize: 13, color: 'var(--muted)'
+                        }}>Todos os itens estão em Hoje.</div>
+                      )}
+                    </div>
+                  );
+                })}
               </>
             )}
 
-            {dailyItems.length === 0 && (
+            {dailyRows.length === 0 && (
               <div style={{
                 flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
                 justifyContent: 'center', gap: 12, paddingBottom: 80
@@ -180,7 +235,7 @@ export default function HomeScreen({ navigate }: Props) {
                 <div style={{ fontSize: 48 }}>📝</div>
                 <div style={{ fontSize: 20, fontWeight: 700 }}>Nenhuma tarefa diária</div>
                 <div style={{ fontSize: 14, color: 'var(--muted)', textAlign: 'center' }}>
-                  Adicione uma tarefa do tipo "Dia a dia" e crie sub-itens nela.
+                  Toque em + e selecione "Dia a dia".
                 </div>
               </div>
             )}

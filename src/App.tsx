@@ -44,7 +44,6 @@ export default function App() {
           <AddTaskScreen
             task={screen.task}
             onBack={goBack}
-            onSaved={(task) => setScreen({ name: 'addTask', task })}
           />
         )}
       </div>
