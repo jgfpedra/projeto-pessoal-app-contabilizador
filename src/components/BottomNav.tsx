@@ -1,8 +1,8 @@
 import { Screen } from '../App';
 
 interface Props {
-  active: 'home' | 'stats';
-  onSwitch: (tab: 'home' | 'stats') => void;
+  active: 'home' | 'calendar';
+  onSwitch: (tab: 'home' | 'calendar') => void;
   navigate: (s: Screen) => void;
 }
 
@@ -11,12 +11,12 @@ export default function BottomNav({ active, onSwitch, navigate }: Props) {
     <nav style={{
       display: 'flex', alignItems: 'center',
       background: 'var(--surface)', borderTop: '1px solid var(--border)',
-      padding: '8px 0 calcc(20px + env(safe-area-inset-bottom))',
+      padding: '8px 0 calc(20px + env(safe-area-inset-bottom))',
     }}>
       <NavBtn label="Today" icon={active === 'home' ? '✦' : '○'} active={active === 'home'} onClick={() => onSwitch('home')} />
       <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
         <button
-          onClick={() => navigate({ name: 'addTask' })}
+          onClick={() => navigate({ name: 'addEvent' })}
           style={{
             width: 52, height: 52, borderRadius: '50%',
             background: 'var(--accent)', color: '#000',
@@ -26,7 +26,7 @@ export default function BottomNav({ active, onSwitch, navigate }: Props) {
           }}
         >+</button>
       </div>
-      <NavBtn label="Stats" icon={active === 'stats' ? '▪' : '□'} active={active === 'stats'} onClick={() => onSwitch('stats')} />
+      <NavBtn label="Calendar" icon={active === 'calendar' ? '▪' : '□'} active={active === 'calendar'} onClick={() => onSwitch('calendar')} />
     </nav>
   );
 }

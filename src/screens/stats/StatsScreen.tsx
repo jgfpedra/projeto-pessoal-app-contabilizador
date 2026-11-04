@@ -9,7 +9,9 @@ interface TaskRow {
   totalReps: number;
 }
 
-export default function StatsScreen() {
+interface Props { onBack: () => void; }
+
+export default function StatsScreen({ onBack }: Props) {
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [selected, setSelected] = useState(0);
   const [weekly, setWeekly] = useState<{ label: string; count: number }[]>([]);
@@ -49,7 +51,10 @@ export default function StatsScreen() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <div style={{ padding: '24px 16px 12px', fontSize: 32, fontWeight: 900 }}>Stats</div>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '16px', gap: 12 }}>
+        <button onClick={onBack} style={{ background: 'none', color: 'var(--text)', fontSize: 22, padding: 4 }}>‹</button>
+        <div style={{ fontSize: 28, fontWeight: 900 }}>Stats</div>
+      </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
         {/* Task selector */}
