@@ -1,5 +1,9 @@
+function pad(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
 export function toDateStr(date: Date): string {
-  return date.toISOString().split('T')[0];
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 export function today(): string {
@@ -36,10 +40,6 @@ export function daysInMonth(year: number, month: number): number {
 
 export function isoFromDateAndTime(dateStr: string, timeStr: string): string {
   return new Date(`${dateStr}T${timeStr}:00`).toISOString();
-}
-
-function pad(n: number): string {
-  return String(n).padStart(2, '0');
 }
 
 /** Local calendar date (YYYY-MM-DD) of an ISO instant, for <input type="date">. */

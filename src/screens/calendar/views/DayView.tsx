@@ -1,5 +1,5 @@
 import { CalendarEvent } from '../../../types';
-import { formatTime } from '../../../utils/dates';
+import { formatTime, localDateFromIso, toDateStr } from '../../../utils/dates';
 
 interface Props {
   events: CalendarEvent[];
@@ -9,23 +9,35 @@ interface Props {
 
 const HOUR_HEIGHT = 64; // px por hora
 const TOTAL_HEIGHT = HOUR_HEIGHT * 24;
+const DAY_MS = 24 * 3600000;
 
 function getEventPosition(event: CalendarEvent, dateStr: string) {
   const dayStart = new Date(dateStr + 'T00:00:00').getTime();
-  const dayEnd = dayStart + 24 * 3600000;
+  const dayEnd = dayStart + DAY_MS;
 
-  const start = Math.max(new Date(event.startTime).getTime(), dayStart);
-  const end = Math.min(new Date(event.endTime).getTime(), dayEnd);
+  const eventStart = new Date(event.startTime).getTime();
+  const eventEnd = new Date(event.endTime).getTime();
+  const eventStartDay = new Date(localDateFromIso(event.startTime) + 'T00:00:00').getTime();
+
+  // Recorrências mantêm o horário do dia, mas precisam ser deslocadas para a
+  // data que está sendo visualizada. Sem isso, todas caem na meia-noite.
+  const shift = event.recurrence.type === 'none' ? 0 : dayStart - eventStartDay;
+
+  const occurrenceStart = eventStart + shift;
+  const occurrenceEnd = eventEnd + shift;
+
+  const start = Math.max(occurrenceStart, dayStart);
+  const end = Math.min(occurrenceEnd, dayEnd);
 
   const top = ((start - dayStart) / 3600000) * HOUR_HEIGHT;
   const height = Math.max(((end - start) / 3600000) * HOUR_HEIGHT, 24); // mínimo 24px
 
-  return { top, height };
+  return { top, height, endDateStr: toDateStr(new Date(occurrenceEnd)) };
 }
 
 export default function DayView({ events, dateStr, onEventPress }: Props) {
   const now = new Date();
-  const todayStr = now.toISOString().split('T')[0];
+  const todayStr = toDateStr(now);
   const isToday = dateStr === todayStr;
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
   const currentTop = (currentMinutes / 60) * HOUR_HEIGHT;
@@ -74,7 +86,7 @@ export default function DayView({ events, dateStr, onEventPress }: Props) {
 
           {/* eventos */}
           {events.map(event => {
-            const { top, height } = getEventPosition(event, dateStr);
+            const { top, height, endDateStr } = getEventPosition(event, dateStr);
             return (
               <div key={event.id} onClick={() => onEventPress(event)} style={{
                 position: 'absolute', top, left: 4, right: 4, height,
@@ -90,8 +102,8 @@ export default function DayView({ events, dateStr, onEventPress }: Props) {
                 {height > 36 && (
                   <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
                     {formatTime(event.startTime)} → {formatTime(event.endTime)}
-                    {event.endTime.split('T')[0] !== dateStr && (
-                      <span> ({new Date(event.endTime + '').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })})</span>
+                    {endDateStr !== dateStr && (
+                      <span> ({new Date(endDateStr + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })})</span>
                     )}
                   </div>
                 )}

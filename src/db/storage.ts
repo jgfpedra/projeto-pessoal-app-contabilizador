@@ -1,10 +1,11 @@
 import { Preferences } from '@capacitor/preferences';
 import { CalendarEvent, DayOfWeek } from '../types';
+import { toDateStr, localDateFromIso } from '../utils/dates';
 
 const EVENTS_KEY = 'events';
 
 export function today(): string {
-  return new Date().toISOString().split('T')[0];
+  return toDateStr(new Date());
 }
 
 async function getAllEvents(): Promise<Record<string, CalendarEvent>> {
@@ -49,7 +50,7 @@ export async function deleteEvent(id: string): Promise<void> {
 
 // Retorna todos os eventos que ocorrem numa data específica (considera recorrência)
 export function eventOccursOnDate(event: CalendarEvent, dateStr: string): boolean {
-  const eventDate = event.startTime.split('T')[0];
+  const eventDate = localDateFromIso(event.startTime);
   if (event.recurrence.type === 'none') return eventDate === dateStr;
 
   if (eventDate > dateStr) return false;
@@ -103,8 +104,8 @@ export async function getEventsForDate(dateStr: string): Promise<CalendarEvent[]
   const events = await getEvents();
   return events.filter(e => {
     if (eventOccursOnDate(e, dateStr)) return true;
-    const endDate = e.endTime.split('T')[0];
-    const startDate = e.startTime.split('T')[0];
+    const endDate = localDateFromIso(e.endTime);
+    const startDate = localDateFromIso(e.startTime);
     return endDate === dateStr && startDate !== dateStr;
   }).sort((a, b) => a.startTime.localeCompare(b.startTime));
 }
